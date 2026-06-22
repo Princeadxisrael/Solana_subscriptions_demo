@@ -12,9 +12,14 @@ import {
   mintTo,
   getAccount,
 } from "@solana/spl-token";
+import * as fs from "fs";
+import * as path from "path";
 import { c, log, ONE_TOKEN, TOKEN_PROGRAM_ID } from "./constants";
 
-// ─── Shared context passed between demos ──────────────────────────────────────
+const STATE_FILE = path.join(__dirname, "..", ".demo-state.json");
+
+
+// Shared context passed between demos 
 export interface DemoContext {
   connection: Connection;
   alice:      Keypair;   // delegator / subscriber
@@ -26,7 +31,7 @@ export interface DemoContext {
   merchantAta: PublicKey;
 }
 
-// ─── Deterministic keypairs (same addresses on every run) ─────────────────────
+//  Deterministic keypairs (same addresses on every run) 
 // Using fixed 32-byte seeds so PDA addresses are predictable across runs.
 function makeKeypair(seed: string): Keypair {
   const seedBytes = Buffer.alloc(32);
@@ -34,11 +39,11 @@ function makeKeypair(seed: string): Keypair {
   return Keypair.fromSeed(seedBytes);
 }
 
-// ─── Main setup function ──────────────────────────────────────────────────────
+// Main setup function
 export async function setup(): Promise<DemoContext> {
   log.section("Setup — wallets, mint, ATAs");
 
-  // ── Connection ──────────────────────────────────────────────────────────────
+  // Connection 
   const connection = new Connection("http://localhost:8899", "confirmed");
 
   // Verify validator is running
@@ -52,7 +57,7 @@ export async function setup(): Promise<DemoContext> {
     process.exit(1);
   }
 
-  // ── Wallets ─────────────────────────────────────────────────────────────────
+
   const alice    = makeKeypair("demo-alice-000000000000000000000000");
   const bob      = makeKeypair("demo-bob-0000000000000000000000000000");
   const merchant = makeKeypair("demo-merchant-00000000000000000000000");
@@ -66,7 +71,7 @@ export async function setup(): Promise<DemoContext> {
   log.key("Bob      (delegatee)", bob.publicKey.toBase58());
   log.key("Merchant (plan owner)", merchant.publicKey.toBase58());
 
-  // ── Mock USDC mint (Alice is mint authority, 6 decimals) ────────────────────
+  // Mock USDC mint (Alice is mint authority, 6 decimals)
   log.step("Creating mock USDC mint");
   const mint = await createMint(
     connection,
@@ -80,13 +85,13 @@ export async function setup(): Promise<DemoContext> {
   );
   log.key("Mint address", mint.toBase58());
 
-  // ── Associated Token Accounts ────────────────────────────────────────────────
+
   log.step("Creating ATAs");
   const aliceAtaInfo    = await getOrCreateAssociatedTokenAccount(connection, alice, mint, alice.publicKey);
   const bobAtaInfo      = await getOrCreateAssociatedTokenAccount(connection, alice, mint, bob.publicKey);
   const merchantAtaInfo = await getOrCreateAssociatedTokenAccount(connection, alice, mint, merchant.publicKey);
 
-  // ── Mint 10,000 USDC to Alice ────────────────────────────────────────────────
+  // Mint 10,000 USDC to Alice 
   log.step("Minting 10,000 USDC to Alice");
   await mintTo(
     connection,
@@ -101,6 +106,24 @@ export async function setup(): Promise<DemoContext> {
   log.balance("Alice balance", aliceBalance);
   log.balance("Bob balance  ", 0n);
 
+
+  // Persist run metadata so `npm run verify` can find this mint later
+  // without the user having to copy-paste an address by hand.
+  fs.writeFileSync(
+    STATE_FILE,
+    JSON.stringify(
+      {
+        mint: mint.toBase58(),
+        alice: alice.publicKey.toBase58(),
+        bob: bob.publicKey.toBase58(),
+        merchant: merchant.publicKey.toBase58(),
+        timestamp: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
+
   return {
     connection,
     alice,
@@ -113,8 +136,7 @@ export async function setup(): Promise<DemoContext> {
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
+// Helpers
 /** Airdrop SOL only if the account balance is below the requested amount. */
 export async function airdropIfNeeded(
   connection: Connection,

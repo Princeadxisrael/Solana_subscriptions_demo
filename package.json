@@ -3,18 +3,18 @@
   "version": "1.0.0",
   "description": "Developer prototype demonstrating the Solana Subscriptions program",
   "scripts": {
-    "demo":          "tsx src/index.ts",
-    "demo:fixed":    "tsx src/01-fixed.ts",
+    "demo": "tsx src/index.ts",
+    "demo:fixed": "tsx src/01-fixed.ts",
     "demo:recurring": "tsx src/02-recurring.ts",
-    "demo:plan":     "tsx src/03-plan.ts"
+    "demo:plan": "tsx src/03-plan.ts"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.95.3",
-    "@solana/spl-token": "^0.4.9"
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.3"
   },
   "devDependencies": {
+    "@types/node": "^22.20.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "@types/node": "^22.10.0"
+    "typescript": "^5.7.3"
   }
 }

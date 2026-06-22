@@ -17,10 +17,7 @@ import {
   getEventAuthorityPDA,
 } from "./pdas";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Helpers to construct AccountMeta objects
 function acc(
   pubkey: PublicKey,
   isSigner: boolean,

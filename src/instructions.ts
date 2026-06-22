@@ -17,7 +17,10 @@ import {
   getEventAuthorityPDA,
 } from "./pdas";
 
-// Helpers to construct AccountMeta objects
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 function acc(
   pubkey: PublicKey,
   isSigner: boolean,
@@ -97,6 +100,16 @@ export function initSubscriptionAuthority(
  * Creates a FixedDelegation PDA granting `delegatee` the right to spend
  * up to `amount` tokens. Optionally expires at `expiryTs` (0 = no expiry).
  *
+ * Data layout — CreateFixedDelegationData (#[repr(C, packed)], 32 bytes):
+ *   nonce:    u64                                    @0
+ *   amount:   u64                                    @8
+ *   expiry_ts: i64                                   @16
+ *   expected_subscription_authority_init_id: i64      @24
+ *
+ * IMPORTANT: `expected_subscription_authority_init_id` must equal the live
+ * SA's current init_id (read via getSubscriptionAuthorityInitId). The
+ * program rejects the call with StaleSubscriptionAuthority otherwise.
+ *
  * Accounts:
  *   0  delegator       signer, writable
  *   1  SA PDA
@@ -111,18 +124,20 @@ export function createFixedDelegation(
   mint: PublicKey,
   nonce: bigint,
   amount: bigint,
-  expiryTs: bigint
+  expiryTs: bigint,
+  expectedInitId: bigint
 ): TransactionInstruction {
   const [saPDA]         = getSubscriptionAuthorityPDA(delegator, mint);
   const [delegationPDA] = getDelegationPDA(saPDA, delegator, delegatee, nonce);
 
-  // data layout: disc(1) | nonce(8) | amount(8) | expiry_ts(8)
-  const data = Buffer.alloc(25);
+  // data layout: disc(1) | nonce(8) | amount(8) | expiry_ts(8) | expected_init_id(8)
+  const data = Buffer.alloc(33);
   let off = 0;
   data.writeUInt8(Disc.CreateFixedDelegation, off++);
   off = writeU64(data, off, nonce);
   off = writeU64(data, off, amount);
   off = writeI64(data, off, expiryTs);
+  off = writeI64(data, off, expectedInitId);
 
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -145,6 +160,14 @@ export function createFixedDelegation(
  * `amountPerPeriod` tokens per `periodLengthS` seconds, starting at
  * `startTs` and optionally expiring at `expiryTs`.
  *
+ * Data layout — CreateRecurringDelegationData (#[repr(C, packed)], 48 bytes):
+ *   nonce:            u64  @0
+ *   amount_per_period: u64  @8
+ *   period_length_s:  u64  @16
+ *   start_ts:         i64  @24
+ *   expiry_ts:        i64  @32
+ *   expected_subscription_authority_init_id: i64  @40
+ *
  * Accounts: same layout as create_fixed_delegation
  */
 export function createRecurringDelegation(
@@ -155,13 +178,14 @@ export function createRecurringDelegation(
   amountPerPeriod: bigint,
   periodLengthS: bigint,
   startTs: bigint,
-  expiryTs: bigint
+  expiryTs: bigint,
+  expectedInitId: bigint
 ): TransactionInstruction {
   const [saPDA]         = getSubscriptionAuthorityPDA(delegator, mint);
   const [delegationPDA] = getDelegationPDA(saPDA, delegator, delegatee, nonce);
 
-  // data layout: disc(1) | nonce(8) | amt_per_period(8) | period_length_s(8) | start_ts(8) | expiry_ts(8)
-  const data = Buffer.alloc(41);
+  // data layout: disc(1) | nonce(8) | amt_per_period(8) | period_length_s(8) | start_ts(8) | expiry_ts(8) | expected_init_id(8)
+  const data = Buffer.alloc(49);
   let off = 0;
   data.writeUInt8(Disc.CreateRecurringDelegation, off++);
   off = writeU64(data, off, nonce);
@@ -169,6 +193,7 @@ export function createRecurringDelegation(
   off = writeU64(data, off, periodLengthS);
   off = writeI64(data, off, startTs);
   off = writeI64(data, off, expiryTs);
+  off = writeI64(data, off, expectedInitId);
 
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -221,15 +246,16 @@ export function revokeDelegation(
  * Deducts from delegation.amount, then SA transfers tokens.
  * Emits FixedTransferEvent via self-CPI.
  *
- * Accounts:
- *   0  delegation PDA  writable
+ * Accounts (source: DelegationTransferAccounts in transfer_utils.rs):
+ *   0  delegation PDA      writable
  *   1  SA PDA
- *   2  delegator ATA   writable  (source)
- *   3  receiver ATA    writable  (destination)
- *   4  token_program
- *   5  delegatee       signer
- *   6  event authority
- *   7  program ID      (for self-CPI event emission)
+ *   2  delegator ATA       writable  (source)
+ *   3  receiver ATA        writable  (destination)
+ *   4  token_mint                    <-- easy to miss; sits before token_program
+ *   5  token_program
+ *   6  delegatee           signer
+ *   7  event authority
+ *   8  program ID          (for self-CPI event emission)
  */
 export function transferFixed(
   delegationPDA: PublicKey,
@@ -258,6 +284,7 @@ export function transferFixed(
       acc(saPDA,           false, false),
       acc(delegatorAta,    false, true),
       acc(receiverAta,     false, true),
+      acc(mint,            false, false),
       acc(TOKEN_PROGRAM_ID,false, false),
       acc(delegatee,       true,  false),
       acc(eventAuthority,  false, false),
@@ -275,7 +302,8 @@ export function transferFixed(
  * Handles period rollover automatically (if current time > period end, resets counter).
  * Emits RecurringTransferEvent via self-CPI.
  *
- * Accounts: identical to transfer_fixed
+ * Accounts: identical to transfer_fixed (note the token_mint account
+ * between receiver_ata and token_program — easy to miss).
  */
 export function transferRecurring(
   delegationPDA: PublicKey,
@@ -304,6 +332,7 @@ export function transferRecurring(
       acc(saPDA,           false, false),
       acc(delegatorAta,    false, true),
       acc(receiverAta,     false, true),
+      acc(mint,            false, false),
       acc(TOKEN_PROGRAM_ID,false, false),
       acc(delegatee,       true,  false),
       acc(eventAuthority,  false, false),
@@ -394,6 +423,21 @@ export function createPlan(
  * the SubscriptionDelegation at this point — this is the ghost-account protection.
  * Emits SubscriptionCreatedEvent via self-CPI.
  *
+ * Data layout — SubscribeData (#[repr(C, packed)], 73 bytes):
+ *   plan_id:                 u64       @0
+ *   plan_bump:                u8        @8
+ *   expected_mint:            [u8;32]   @9
+ *   expected_amount:          u64       @41
+ *   expected_period_hours:    u64       @49
+ *   expected_created_at:      i64       @57
+ *   expected_subscription_authority_init_id: i64  @65
+ *
+ * IMPORTANT: the four `expected_*` fields are the subscriber's attestation
+ * to the plan's CURRENT on-chain state. The program reads the live Plan
+ * account and rejects the call (PlanTermsMismatch) if any value differs.
+ * Fetch these with getLivePlanTerms() and getSubscriptionAuthorityInitId()
+ * immediately before building this instruction.
+ *
  * Accounts:
  *   0  subscriber           signer, writable
  *   1  merchant             (plan owner)
@@ -409,19 +453,30 @@ export function subscribe(
   merchant: PublicKey,
   mint: PublicKey,
   planId: bigint,
-  planBump: number
+  planBump: number,
+  expectedAmount: bigint,
+  expectedPeriodHours: bigint,
+  expectedCreatedAt: bigint,
+  expectedInitId: bigint
 ): TransactionInstruction {
   const [planPDA]          = getPlanPDA(merchant, planId);
   const [subscriptionPDA]  = getSubscriptionPDA(planPDA, subscriber);
   const [saPDA]            = getSubscriptionAuthorityPDA(subscriber, mint);
   const [eventAuthority]   = getEventAuthorityPDA();
 
-  // data layout: disc(1) | plan_id(8) | plan_bump(1)
-  const data = Buffer.alloc(10);
+  // data layout: disc(1) | plan_id(8) | plan_bump(1) | expected_mint(32)
+  //            | expected_amount(8) | expected_period_hours(8)
+  //            | expected_created_at(8) | expected_init_id(8)
+  const data = Buffer.alloc(74);
   let off = 0;
   data.writeUInt8(Disc.Subscribe, off++);
   off = writeU64(data, off, planId);
-  data.writeUInt8(planBump, off);
+  data.writeUInt8(planBump, off); off += 1;
+  off = writePubkey(data, off, mint);
+  off = writeU64(data, off, expectedAmount);
+  off = writeU64(data, off, expectedPeriodHours);
+  off = writeI64(data, off, expectedCreatedAt);
+  off = writeI64(data, off, expectedInitId);
 
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -447,16 +502,17 @@ export function subscribe(
  * terms match the subscription's snapshot (ghost-account check), period limit.
  * Emits SubscriptionTransferEvent via self-CPI.
  *
- * Accounts:
+ * Accounts (source: TransferSubscriptionAccounts in transfer_subscription.rs):
  *   0  subscription PDA  writable
  *   1  plan PDA
  *   2  SA PDA
  *   3  subscriber ATA    writable  (source)
  *   4  receiver ATA      writable  (destination)
  *   5  caller            signer
- *   6  token_program
- *   7  event authority
- *   8  program ID
+ *   6  token_mint                  <-- easy to miss; sits before token_program
+ *   7  token_program
+ *   8  event authority
+ *   9  program ID
  */
 export function transferSubscription(
   subscriptionPDA: PublicKey,
@@ -488,6 +544,7 @@ export function transferSubscription(
       acc(subscriberAta,    false, true),
       acc(receiverAta,      false, true),
       acc(caller,           true,  false),
+      acc(mint,             false, false),
       acc(TOKEN_PROGRAM_ID, false, false),
       acc(eventAuthority,   false, false),
       acc(PROGRAM_ID,       false, false),

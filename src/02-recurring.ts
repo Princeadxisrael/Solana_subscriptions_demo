@@ -23,6 +23,7 @@ import {
   transferRecurring,
   revokeDelegation,
 } from "./instructions";
+import { getSubscriptionAuthorityInitId } from "./chain";
 import { DemoContext, sendTx, printBalances } from "./setup";
 
 export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
@@ -60,7 +61,8 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
       AMOUNT_PER_PERIOD,
       PERIOD_SECONDS,
       startTs,
-      expiryTs
+      expiryTs,
+      await getSubscriptionAuthorityInitId(connection, saPDA)
     ),
     [alice]
   );

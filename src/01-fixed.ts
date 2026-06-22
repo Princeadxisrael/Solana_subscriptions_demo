@@ -7,13 +7,12 @@
  *
  * Flow:
  *   1. Alice initialises her Subscription Authority (SA) for the USDC mint
- *   2. Alice creates a FixedDelegation to Bob, 200 USDC, expiry = now + 10 min
+ *   2. Alice creates a FixedDelegation → Bob, 200 USDC, expiry = now + 10 min
  *   3. Bob transfers  80 USDC  (120 remaining)
  *   4. Bob transfers 120 USDC  (  0 remaining — fully exhausted)
  *   5. Alice revokes the delegation and reclaims rent
  */
 
-import { sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
 import { log, ONE_TOKEN } from "./constants";
 import {
   getSubscriptionAuthorityPDA,
@@ -25,12 +24,13 @@ import {
   transferFixed,
   revokeDelegation,
 } from "./instructions";
+import { getSubscriptionAuthorityInitId } from "./chain";
 import { DemoContext, sendTx, printBalances } from "./setup";
 
 export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   const { connection, alice, bob, mint, aliceAta, bobAta } = ctx;
 
-  //  Derive addresses
+  // ── Derive addresses ─────────────────────────────────────────────────────────
   const [saPDA]   = getSubscriptionAuthorityPDA(alice.publicKey, mint);
   const NONCE     = 1n;
   const [delPDA]  = getDelegationPDA(saPDA, alice.publicKey, bob.publicKey, NONCE);
@@ -69,6 +69,12 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   log.info("PDA seeds: [\"delegation\", SA, alice, bob, nonce=1]");
   log.info("Stores:    amount=200 USDC  |  expiry_ts  |  payer=alice");
 
+  // The program requires the delegator to attest to the SA's *current*
+  // init_id (set from Clock::slot when the SA was created). This guards
+  // against creating a delegation against a stale/closed-and-recreated SA.
+  const initId = await getSubscriptionAuthorityInitId(connection, saPDA);
+  log.info(`SA init_id (read on-chain): ${initId}`);
+
   const createSig = await sendTx(
     connection,
     createFixedDelegation(
@@ -77,7 +83,8 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
       mint,
       NONCE,
       AMOUNT,
-      expiryTs
+      expiryTs,
+      initId
     ),
     [alice]
   );

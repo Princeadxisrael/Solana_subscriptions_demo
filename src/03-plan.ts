@@ -37,6 +37,7 @@ import {
   cancelSubscription,
   resumeSubscription,
 } from "./instructions";
+import { getLivePlanTerms, getSubscriptionAuthorityInitId } from "./chain";
 import { DemoContext, sendTx, printBalances } from "./setup";
 
 export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
@@ -90,6 +91,16 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
   log.info("This snapshot is Alice's receipt — if merchant recreates the plan with");
   log.info("different terms at the same PDA, check_plan_terms() will detect it.");
 
+  // The subscribe instruction requires the subscriber to attest to the
+  // EXACT live values currently on the plan account (mint, amount,
+  // period_hours, created_at) plus her own SA's current init_id. The
+  // program re-reads the live plan and rejects the call if anything has
+  // changed since these were read — this is what stops a stale signed
+  // "subscribe" from silently binding to different terms.
+  const livePlan = await getLivePlanTerms(connection, planPDA);
+  const initId   = await getSubscriptionAuthorityInitId(connection, aliceSaPDA);
+  log.info(`Live plan terms read on-chain: amount=${livePlan.amount}, period_hours=${livePlan.periodHours}, created_at=${livePlan.createdAt}`);
+
   const subscribeSig = await sendTx(
     connection,
     subscribe(
@@ -97,7 +108,11 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
       merchant.publicKey,
       mint,
       PLAN_ID,
-      planBump
+      planBump,
+      livePlan.amount,
+      livePlan.periodHours,
+      livePlan.createdAt,
+      initId
     ),
     [alice]
   );

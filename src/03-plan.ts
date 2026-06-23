@@ -43,13 +43,13 @@ import { DemoContext, sendTx, printBalances } from "./setup";
 export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
   const { connection, alice, merchant, mint, aliceAta, merchantAta } = ctx;
 
-  // ── Plan parameters ──────────────────────────────────────────────────────────
+  // Plan parameters 
   const PLAN_ID           = 1001n;
   const AMOUNT_PER_PERIOD = 10n * ONE_TOKEN;  // 10.000000 USDC per period
   const PERIOD_HOURS      = 1n;               // 1 hour (min allowed by program)
   const END_TS            = 0n;              // 0 = plan never expires
 
-  // ── Derive all PDAs upfront ──────────────────────────────────────────────────
+  // Derive all PDAs upfront 
   const [planPDA, planBump]         = getPlanPDA(merchant.publicKey, PLAN_ID);
   const [subscriptionPDA]           = getSubscriptionPDA(planPDA, alice.publicKey);
   const [aliceSaPDA]                = getSubscriptionAuthorityPDA(alice.publicKey, mint);
@@ -61,7 +61,7 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
   log.key("Period length",     "1 hour");
   log.key("Plan expiry",       "none");
 
-  // ── Step 1: Merchant publishes a Plan ────────────────────────────────────────
+  // Merchant publishes a Plan 
   log.step("Merchant creates a subscription plan");
   log.info("Terms are locked in at creation. amount, period_hours, and created_at");
   log.info("are IMMUTABLE. The program overwrites created_at with the on-chain clock");
@@ -82,9 +82,9 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     ),
     [merchant]
   );
-  log.ok(`Plan created  →  ${createPlanSig.slice(0, 20)}…`);
+  log.tx("Plan created", createPlanSig);
 
-  // ── Step 2: Alice subscribes ─────────────────────────────────────────────────
+  // Alice subscribes 
   log.step("Alice subscribes to the plan");
   log.info("Creates a SubscriptionDelegation PDA seeded [\"subscription\", planPDA, alice].");
   log.info("Snapshots plan.terms (amount, period_hours, created_at) into the PDA.");
@@ -116,12 +116,12 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     ),
     [alice]
   );
-  log.ok(`Subscribed  →  ${subscribeSig.slice(0, 20)}…`);
+  log.tx("Subscribed", subscribeSig);
 
-  // ── Step 3: Merchant pulls first payment ─────────────────────────────────────
+  // Merchant pulls first payment 
   log.step("Merchant pulls first payment  (10 USDC)");
-  log.info("Validates: plan not expired ✓ | caller = merchant (owner) ✓");
-  log.info("           terms match snapshot ✓ | period limit not exceeded ✓");
+  log.info("Validates: plan not expired  | caller = merchant (owner) ");
+  log.info("           terms match snapshot  | period limit not exceeded ");
   log.info("Transfers via Alice's SA → Alice's ATA → Merchant's ATA.");
 
   const pull1Sig = await sendTx(
@@ -135,10 +135,10 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     ),
     [merchant]
   );
-  log.ok(`Payment 1 (10 USDC)  →  ${pull1Sig.slice(0, 20)}…`);
+  log.tx("Payment 1 (10 USDC)", pull1Sig);
   await printBalances(connection, ctx);
 
-  // ── Step 4: Alice cancels ─────────────────────────────────────────────────────
+  // Alice cancels 
   log.step("Alice cancels her subscription");
   log.info("Sets expires_at_ts = end of CURRENT billing period (grace period).");
   log.info("Alice keeps access / merchant can still bill until the period ends.");
@@ -149,11 +149,11 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     cancelSubscription(alice.publicKey, planPDA, subscriptionPDA),
     [alice]
   );
-  log.ok(`Subscription cancelled  →  ${cancelSig.slice(0, 20)}…`);
+  log.tx("Subscription cancelled", cancelSig);
   log.info("expires_at_ts is now set to end-of-current-period.");
   log.info("Merchant can still pull until that timestamp — grace period is active.");
 
-  // ── Step 5: Alice changes her mind and resumes ───────────────────────────────
+  // Alice changes her mind and resumes 
   log.step("Alice resumes before the cancellation period ends");
   log.info("Clears expires_at_ts back to 0 (active).");
   log.info("current_period_start_ts and amount_pulled_in_period are PRESERVED —");
@@ -165,10 +165,10 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     resumeSubscription(alice.publicKey, planPDA, subscriptionPDA),
     [alice]
   );
-  log.ok(`Subscription resumed  →  ${resumeSig.slice(0, 20)}…`);
+  log.tx("Subscription resumed", resumeSig);
   log.info("expires_at_ts = 0 again. Subscription is fully active.");
 
-  // ── Step 6: Next period — merchant pulls again (simulated by waiting) ─────────
+  // Next period — merchant pulls again (simulated by waiting)
   log.step("Merchant attempts another pull in the same period");
   log.info("The period is 1 hour. 10 USDC already pulled this period.");
   log.info("Attempting to pull 10 USDC again should be rejected — period cap hit.");
@@ -187,13 +187,13 @@ export async function demoPlanSubscription(ctx: DemoContext): Promise<void> {
     );
     log.warn("Pull succeeded (period may have rolled over — timing-dependent)");
   } catch {
-    log.ok("Pull correctly rejected — period cap already reached  ✓");
+    log.ok("Pull correctly rejected — period cap already reached ");
     log.info("Merchant must wait for the period to roll over before billing again.");
   }
 
   log.ok("Demo 3 complete — plan/subscription lifecycle demonstrated.");
 
-  // ── Architecture callout ─────────────────────────────────────────────────────
+  // Architecture callout
   log.info("");
   log.info("Architectural insight: Alice never re-approves anything between demos.");
   log.info("Her SA PDA (created in Demo 1) has been reused across all three flows.");

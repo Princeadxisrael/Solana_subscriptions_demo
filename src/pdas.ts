@@ -94,12 +94,7 @@ export function getEventAuthorityPDA(): [PublicKey, number] {
  * Associated Token Account address (deterministic, no RPC call needed).
  */
 export function getATA(owner: PublicKey, mint: PublicKey): PublicKey {
-  const {
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    TOKEN_PROGRAM_ID,
-  } = require("./constants");
-  return PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID
-  )[0];
+  const { getAssociatedTokenAddressSync } = require("@solana/spl-token");
+  return getAssociatedTokenAddressSync(mint, owner);
 }
+ 

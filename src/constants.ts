@@ -1,24 +1,24 @@
 import { PublicKey } from "@solana/web3.js";
 
-// ─── Program ─────────────────────────────────────────────────────────────────
+
 export const PROGRAM_ID = new PublicKey(
   "De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44"
 );
 
-// ─── System programs ─────────────────────────────────────────────────────────
+
 export const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
 export const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 );
 export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bJ5"
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 );
 
-// ─── Token precision (6 decimals like USDC) ──────────────────────────────────
+
 export const DECIMALS = 6;
 export const ONE_TOKEN = 1_000_000n; // 1.000000 units in base denomination
 
-// ─── Instruction discriminators (single byte, from program source) ────────────
+//instruction discriminators (see program/src/instructions.rs)
 export enum Disc {
   InitSubscriptionAuthority  = 0,
   CreateFixedDelegation      = 1,
@@ -36,7 +36,7 @@ export enum Disc {
   ResumeSubscription         = 13,
 }
 
-// ─── ANSI colour helpers (no extra dependencies) ─────────────────────────────
+
 export const c = {
   reset:  "\x1b[0m",
   bold:   "\x1b[1m",

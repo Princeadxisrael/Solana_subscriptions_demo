@@ -6,7 +6,9 @@
     "demo": "tsx src/index.ts",
     "demo:fixed": "tsx src/01-fixed.ts",
     "demo:recurring": "tsx src/02-recurring.ts",
-    "demo:plan": "tsx src/03-plan.ts"
+    "demo:plan": "tsx src/03-plan.ts",
+    "verify": "tsx src/verify.ts"
+
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

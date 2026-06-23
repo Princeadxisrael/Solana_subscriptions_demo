@@ -29,7 +29,7 @@ import { DemoContext, sendTx, printBalances } from "./setup";
 export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
   const { connection, alice, bob, mint, aliceAta, bobAta } = ctx;
 
-  // ── Derive addresses ─────────────────────────────────────────────────────────
+  // Derive addresses
   // Nonce = 2 to avoid collision with the fixed delegation from demo 1
   const [saPDA]  = getSubscriptionAuthorityPDA(alice.publicKey, mint);
   const NONCE    = 2n;
@@ -45,7 +45,7 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
   log.key("Allowance/period", "300.000000 USDC / hour");
   log.key("Expiry",           "none (perpetual)");
 
-  // ── Step 1: Create RecurringDelegation ───────────────────────────────────────
+  // Create RecurringDelegation
   log.step("Alice creates a RecurringDelegation → Bob  (300 USDC/hour, no expiry)");
   log.info("PDA seeds: [\"delegation\", SA, alice, bob, nonce=2]");
   log.info("Stores:    amount_per_period  |  period_length_s  |  current_period_start_ts");
@@ -66,11 +66,11 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
     ),
     [alice]
   );
-  log.ok(`Delegation created  →  ${createSig.slice(0, 20)}…`);
+  log.tx("Delegation created", createSig);
 
-  // ── Step 2: Bob pulls 100 USDC ───────────────────────────────────────────────
+  // Bob pulls 100 USDC 
   log.step("Bob pulls 100 USDC  (100 / 300 used this period)");
-  log.info("Checks: not expired ✓  |  100 ≤ 300 period limit ✓");
+  log.info("Checks: not expired   |  100 ≤ 300 period limit ");
   log.info("Updates: amount_pulled_in_period → 100");
 
   const pull1Sig = await sendTx(
@@ -83,12 +83,12 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
     ),
     [bob]
   );
-  log.ok(`Transfer 1 (100 USDC)  →  ${pull1Sig.slice(0, 20)}…`);
+  log.tx("Transfer 1 (100 USDC)", pull1Sig);
   await printBalances(connection, ctx);
 
-  // ── Step 3: Bob pulls 150 USDC ───────────────────────────────────────────────
+  // Step 3: Bob pulls 150 USDC 
   log.step("Bob pulls 150 USDC  (250 / 300 used this period)");
-  log.info("Checks: 100 + 150 = 250  ≤  300 limit ✓");
+  log.info("Checks: 100 + 150 = 250  ≤  300 limit ");
   log.info("Updates: amount_pulled_in_period → 250");
 
   const pull2Sig = await sendTx(
@@ -101,12 +101,12 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
     ),
     [bob]
   );
-  log.ok(`Transfer 2 (150 USDC)  →  ${pull2Sig.slice(0, 20)}…`);
+  log.tx("Transfer 2 (150 USDC)", pull2Sig);
   await printBalances(connection, ctx);
 
-  // ── Step 4: Bob tries to pull 100 USDC — should be rejected ─────────────────
+  // Bob tries to pull 100 USDC — should be rejected 
   log.step("Bob attempts to pull 100 USDC  (would exceed 300 USDC period cap)");
-  log.info("250 already pulled  +  100 requested  =  350  >  300  ✖");
+  log.info("250 already pulled  +  100 requested  =  350  >  300  ");
   log.info("The program rejects this — period limit is enforced on-chain.");
   log.info("Bob must wait for the period to roll over before pulling more.");
 
@@ -123,23 +123,23 @@ export async function demoRecurringDelegation(ctx: DemoContext): Promise<void> {
     );
     log.warn("Expected rejection but transaction succeeded — check period timing");
   } catch (e: any) {
-    log.ok("Transaction correctly rejected by the program  ✓");
+    log.ok("Transaction correctly rejected by the program");
     log.info(`Program error: ${e.message?.split("custom program error")[1]?.split('"')[0]?.trim() ?? "period limit exceeded"}`);
     log.info("This is the core safety guarantee: the on-chain program enforces");
     log.info("the per-period cap regardless of what the caller tries to do.");
   }
 
-  // ── Step 5: Alice revokes ────────────────────────────────────────────────────
+  //Alice revokes 
   log.step("Alice revokes the delegation (cleanup)");
   const revokeSig = await sendTx(
     connection,
     revokeDelegation(alice.publicKey, delPDA, alice.publicKey),
     [alice]
   );
-  log.ok(`Delegation revoked  →  ${revokeSig.slice(0, 20)}…`);
+  log.tx("Delegation revoked", revokeSig);
   log.ok("Demo 2 complete — recurring delegation and period enforcement demonstrated.");
 
-  // ── Key concept callout ──────────────────────────────────────────────────────
+ 
   log.info("");
   log.info("Period rollover: when current time > current_period_start_ts + period_length_s,");
   log.info("the program auto-resets amount_pulled_in_period = 0 on the next transfer.");

@@ -92,7 +92,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   log.info("Alice's ATA delegate is now the SA, not Bob directly.");
   log.info("Bob can pull up to 200 USDC — the program enforces the cap.");
 
-  // ── Step 3: Bob transfers 80 USDC ────────────────────────────────────────────
+  //  Bob transfers 80 USDC
   log.step("Bob pulls 80 USDC via transfer_fixed");
   log.info("Program checks: not expired  ✓  |  80 ≤ 200 remaining  ✓");
   log.info("SA executes the token transfer. Delegation.amount → 120.");
@@ -110,7 +110,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   log.tx("Transfer 1 (80 USDC)", pull1Sig);
   await printBalances(connection, ctx);
 
-  // ── Step 4: Bob transfers remaining 120 USDC ─────────────────────────────────
+  // Bob transfers remaining 120 USDC
   log.step("Bob pulls remaining 120 USDC via transfer_fixed");
   log.info("Program checks: not expired  ✓  |  120 ≤ 120 remaining  ✓");
   log.info("Delegation.amount → 0. Delegation is now exhausted.");
@@ -128,7 +128,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   log.tx("Transfer 2 (120 USDC)", pull2Sig);
   await printBalances(connection, ctx);
 
-  // ── Step 5: Alice revokes (cleanup + rent reclaim) ────────────────────────────
+  //  Alice revokes (cleanup + rent reclaim) 
   log.step("Alice revokes the delegation and reclaims rent");
   log.info("Closes the Delegation PDA and returns lamports to alice.");
   log.info("The SA itself remains open — Alice can create new delegations.");

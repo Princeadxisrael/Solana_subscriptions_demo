@@ -30,7 +30,7 @@ import { DemoContext, sendTx, printBalances } from "./setup";
 export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   const { connection, alice, bob, mint, aliceAta, bobAta } = ctx;
 
-  // ── Derive addresses ─────────────────────────────────────────────────────────
+  // Derive addresses 
   const [saPDA]   = getSubscriptionAuthorityPDA(alice.publicKey, mint);
   const NONCE     = 1n;
   const [delPDA]  = getDelegationPDA(saPDA, alice.publicKey, bob.publicKey, NONCE);
@@ -42,7 +42,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
   log.key("Allowance",       "200.000000 USDC");
   log.key("Expires",         new Date(Number(expiryTs) * 1000).toISOString());
 
-  // ── Step 1: Init Subscription Authority ──────────────────────────────────────
+  // Init Subscription Authority 
   log.step("Alice initialises her Subscription Authority");
   log.info("This creates a PDA seeded [SubscriptionAuthority, alice, mint]");
   log.info("and calls Token Program Approve(userAta, SA, u64::MAX).");
@@ -54,7 +54,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
       initSubscriptionAuthority(alice.publicKey, mint, aliceAta),
       [alice]
     );
-    log.ok(`SA created  →  ${sig.slice(0, 20)}…`);
+    log.tx("SA created", sig);
   } catch (e: any) {
     // Idempotent: if already created from a prior run that's fine
     if (e.message?.includes("already in use") || e.message?.includes("custom program error")) {
@@ -64,7 +64,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
     }
   }
 
-  // ── Step 2: Create FixedDelegation ───────────────────────────────────────────
+  // Create FixedDelegation
   log.step("Alice creates a FixedDelegation → Bob  (200 USDC, expires in 10 min)");
   log.info("PDA seeds: [\"delegation\", SA, alice, bob, nonce=1]");
   log.info("Stores:    amount=200 USDC  |  expiry_ts  |  payer=alice");
@@ -88,7 +88,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
     ),
     [alice]
   );
-  log.ok(`Delegation created  →  ${createSig.slice(0, 20)}…`);
+  log.tx("Delegation created", createSig);
   log.info("Alice's ATA delegate is now the SA, not Bob directly.");
   log.info("Bob can pull up to 200 USDC — the program enforces the cap.");
 
@@ -107,7 +107,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
     ),
     [bob]
   );
-  log.ok(`Transfer 1 (80 USDC)  →  ${pull1Sig.slice(0, 20)}…`);
+  log.tx("Transfer 1 (80 USDC)", pull1Sig);
   await printBalances(connection, ctx);
 
   // ── Step 4: Bob transfers remaining 120 USDC ─────────────────────────────────
@@ -125,7 +125,7 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
     ),
     [bob]
   );
-  log.ok(`Transfer 2 (120 USDC)  →  ${pull2Sig.slice(0, 20)}…`);
+  log.tx("Transfer 2 (120 USDC)", pull2Sig);
   await printBalances(connection, ctx);
 
   // ── Step 5: Alice revokes (cleanup + rent reclaim) ────────────────────────────
@@ -138,6 +138,6 @@ export async function demoFixedDelegation(ctx: DemoContext): Promise<void> {
     revokeDelegation(alice.publicKey, delPDA, alice.publicKey),
     [alice]
   );
-  log.ok(`Delegation revoked  →  ${revokeSig.slice(0, 20)}…`);
+  log.tx("Delegation revoked", revokeSig);
   log.ok("Demo 1 complete — fixed delegation fully demonstrated.");
 }

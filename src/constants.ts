@@ -64,10 +64,35 @@ export const log = {
     console.log(`  ${c.bold}${title}${c.reset}`);
     console.log("─".repeat(60));
   },
+
+   /** Print a completed transaction: full signature + clickable explorer link. */
+  tx: (label: string, signature: string) => {
+    console.log(`  ${c.green}✔${c.reset}  ${label}`);
+    console.log(`     ${c.dim}signature: ${c.reset}${signature}`);
+    console.log(`     ${c.dim}explorer:  ${c.reset}${c.cyan}${explorerTxUrl(signature)}${c.reset}`);
+  },
 };
 
 export function formatTokens(base: bigint): string {
   const whole = base / ONE_TOKEN;
   const frac  = base % ONE_TOKEN;
   return `${whole}.${frac.toString().padStart(6, "0")}`;
+}
+
+const LOCAL_RPC = "http://localhost:8899";
+
+/** 
+ * Solana Explorer URL for a transaction, pointed at our local validator.
+ * Explorer fetches directly from customUrl in browser — no special
+ * setup needed beyond CORS, which solana-test-validator and Surfpool both
+ * allow by default.
+ */
+
+export function explorerTxUrl(signature: string): string {
+  return `https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${encodeURIComponent(LOCAL_RPC)}`;
+}
+ 
+/** Solana Explorer URL for an account, pointed at local validator. */
+export function explorerAccountUrl(address: string): string {
+  return `https://explorer.solana.com/address/${address}?cluster=custom&customUrl=${encodeURIComponent(LOCAL_RPC)}`;
 }
